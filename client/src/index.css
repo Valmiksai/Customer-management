@@ -1,0 +1,120 @@
+/* File: client/src/index.css */
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f4f7f6;
+  color: #333;
+}
+
+/* Main container for our app */
+.container {
+  max-width: 900px;
+  margin: 20px auto;
+  padding: 20px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* --- General Form and Button Styles --- */
+input[type="text"],
+input[type="number"],
+input[type="email"] {
+  width: 95%;
+  padding: 8px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+button {
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  background-color: #007bff;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+button:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+/* --- Filter Form on CustomerListPage --- */
+.filter-form {
+  display: flex;
+  flex-wrap: wrap; /* Allows items to wrap to the next line on small screens */
+  gap: 10px; /* Space between items */
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 15px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+
+.filter-form input {
+  flex-grow: 1; /* Allows inputs to grow and fill space */
+  margin-bottom: 0; /* Override general input style */
+}
+
+/* --- Customer Detail Page --- */
+.address-item {
+  border: 1px solid #eee;
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+}
+
+.address-item p {
+  margin: 0 0 10px 0;
+}
+
+
+/* ------------------------------------------- */
+/* --- 📱 THE MEDIA QUERY FOR MOBILE DEVICES --- */
+/* ------------------------------------------- */
+/* These styles will only apply when the screen width is 768px or less */
+@media (max-width: 768px) {
+  .container {
+    margin: 10px;
+    padding: 15px;
+  }
+  
+  /* Make the filter form inputs stack vertically */
+  .filter-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-form input,
+  .filter-form button {
+    width: 95%; /* Make them take up most of the width */
+  }
+
+  /* Make address form inputs stack too */
+  .add-address-form input {
+    display: block;
+    width: 95%;
+  }
+}
+
+
+.error-message {
+  padding: 15px;
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  margin: 10px 0;
+}

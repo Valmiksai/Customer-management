@@ -1,0 +1,13 @@
+# Dependencies
+/node_modules
+/client/node_modules
+/server/node_modules
+
+# Build folder from React
+/client/build
+
+# Environment variables
+.env
+
+# System files
+.DS_Store
