@@ -1,203 +1,165 @@
 // File: server/index.js
 
-// Import required packages
 const express = require('express');
 const cors = require('cors');
-
-// This line is crucial: it imports the database connection from database.js
-// AND runs the code in that file, setting up our tables.
+const path = require('path');
 const db = require('./database.js');
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
-// Middleware - lets our server accept JSON data and allows cross-origin requests from our React app
 app.use(cors());
 app.use(express.json());
 
-// --- A simple test route ---
-app.get('/', (req, res) => {
-  res.send('API is working!');
-});
-
+app.use(express.static(path.join(__dirname, '../client/build')));
 
 // --- CUSTOMER API ENDPOINTS ---
 
-/**
- * GET: Fetch all customers with FILTERING and PAGINATION.
- * This is the final, most advanced version of this endpoint.
- * - Filters by: city, state, pincode
- * - Paginates by: page, limit
- */
 app.get('/api/customers', (req, res) => {
-  const { city, state, pincode } = req.query;
-  const page = parseInt(req.query.page || 1);
-  const limit = parseInt(req.query.limit || 5);
-  const offset = (page - 1) * limit;
+  try {
+    const { city, state, pincode } = req.query;
+    const page = parseInt(req.query.page || 1);
+    const limit = parseInt(req.query.limit || 5);
+    const offset = (page - 1) * limit;
 
-  let dataSql = `SELECT DISTINCT c.id, c.firstName, c.lastName, c.phoneNumber FROM customers c`;
-  let countSql = `SELECT COUNT(DISTINCT c.id) as count FROM customers c`;
+    let baseSql = `FROM customers c`;
+    const params = [];
+    const whereClauses = [];
 
-  const params = [];
-  const whereClauses = [];
+    if (city || state || pincode) {
+      baseSql += ' LEFT JOIN addresses a ON c.id = a.customer_id';
+    }
+    if (city) { whereClauses.push('a.city LIKE ?'); params.push(`%${city}%`); }
+    if (state) { whereClauses.push('a.state LIKE ?'); params.push(`%${state}%`); }
+    if (pincode) { whereClauses.push('a.pincode LIKE ?'); params.push(`%${pincode}%`); }
+    if (whereClauses.length > 0) {
+      baseSql += ' WHERE ' + whereClauses.join(' AND ');
+    }
 
-  if (city || state || pincode) {
-    const joinClause = ' LEFT JOIN addresses a ON c.id = a.customer_id';
-    dataSql += joinClause;
-    countSql += joinClause;
-  }
-
-  if (city) { whereClauses.push('a.city LIKE ?'); params.push(`%${city}%`); }
-  if (state) { whereClauses.push('a.state LIKE ?'); params.push(`%${state}%`); }
-  if (pincode) { whereClauses.push('a.pincode LIKE ?'); params.push(`%${pincode}%`); }
-
-  if (whereClauses.length > 0) {
-    const whereString = ' WHERE ' + whereClauses.join(' AND ');
-    dataSql += whereString;
-    countSql += whereString;
-  }
-
-  db.get(countSql, params, (err, countRow) => {
-    if (err) { return res.status(500).json({ "error": err.message }); }
-
-    const totalRecords = countRow.count;
+    const countSql = `SELECT COUNT(DISTINCT c.id) as count ${baseSql}`;
+    const totalRecords = db.prepare(countSql).get(params).count;
     const totalPages = Math.ceil(totalRecords / limit);
 
-    dataSql += ' ORDER BY c.firstName, c.lastName LIMIT ? OFFSET ?';
-    const dataParams = [...params, limit, offset];
+    const dataSql = `SELECT DISTINCT c.id, c.firstName, c.lastName, c.phoneNumber ${baseSql} ORDER BY c.firstName, c.lastName LIMIT ? OFFSET ?`;
+    const rows = db.prepare(dataSql).all(...params, limit, offset);
 
-    db.all(dataSql, dataParams, (err, rows) => {
-      if (err) { return res.status(500).json({ "error": err.message }); }
-      
-      res.json({
-        data: rows,
-        pagination: {
-          currentPage: page,
-          totalPages: totalPages,
-          totalRecords: totalRecords
-        }
-      });
+    res.json({
+      data: rows,
+      pagination: { currentPage: page, totalPages: totalPages, totalRecords: totalRecords }
     });
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// GET: Fetch a single customer by ID
 app.get('/api/customers/:id', (req, res) => {
-  const { id } = req.params;
-  const sql = "SELECT * FROM customers WHERE id = ?";
-  db.get(sql, [id], (err, row) => {
-    if (err) { return res.status(500).json({ "error": err.message }); }
-    if (!row) { return res.status(404).json({ "error": "Customer not found" }); }
+  try {
+    const sql = "SELECT * FROM customers WHERE id = ?";
+    const row = db.prepare(sql).get(req.params.id);
+    if (!row) return res.status(404).json({ "error": "Customer not found" });
     res.json(row);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// POST: Create a new customer
 app.post('/api/customers', (req, res) => {
-  const { firstName, lastName, phoneNumber } = req.body;
-  if (!firstName || !lastName || !phoneNumber) {
-    return res.status(400).json({ "error": "Missing required fields" });
+  try {
+    const { firstName, lastName, phoneNumber } = req.body;
+    if (!firstName || !lastName || !phoneNumber) {
+      return res.status(400).json({ "error": "Missing required fields" });
+    }
+    const sql = 'INSERT INTO customers (firstName, lastName, phoneNumber) VALUES (?, ?, ?)';
+    const info = db.prepare(sql).run(firstName, lastName, phoneNumber);
+    res.status(201).json({ "message": "Success", "customerId": info.lastInsertRowid });
+  } catch (err) {
+    res.status(500).json({ "error": err.message });
   }
-
-  const sql = 'INSERT INTO customers (firstName, lastName, phoneNumber) VALUES (?, ?, ?)';
-  db.run(sql, [firstName, lastName, phoneNumber], function(err) {
-    if (err) { return res.status(500).json({ "error": err.message }); }
-    res.status(201).json({ "message": "Success", "customerId": this.lastID });
-  });
 });
 
-// PUT: Update an existing customer by ID
 app.put('/api/customers/:id', (req, res) => {
-  const { id } = req.params;
-  const { firstName, lastName, phoneNumber } = req.body;
-
-  if (!firstName || !lastName || !phoneNumber) {
-    return res.status(400).json({ "error": "Missing required fields" });
+  try {
+    const { firstName, lastName, phoneNumber } = req.body;
+    if (!firstName || !lastName || !phoneNumber) {
+      return res.status(400).json({ "error": "Missing required fields" });
+    }
+    const sql = `UPDATE customers SET firstName = ?, lastName = ?, phoneNumber = ? WHERE id = ?`;
+    const info = db.prepare(sql).run(firstName, lastName, phoneNumber, req.params.id);
+    if (info.changes === 0) return res.status(404).json({ "error": "Customer not found" });
+    res.json({ "message": "success", "data": req.body, "changes": info.changes });
+  } catch (err) {
+    res.status(500).json({ "error": err.message });
   }
-
-  const sql = `UPDATE customers SET firstName = ?, lastName = ?, phoneNumber = ? WHERE id = ?`;
-  const params = [firstName, lastName, phoneNumber, id];
-  db.run(sql, params, function(err) {
-    if (err) { return res.status(500).json({ "error": err.message }); }
-    if (this.changes === 0) { return res.status(404).json({ "error": "Customer not found" }); }
-    res.json({ "message": "success", "data": req.body, "changes": this.changes });
-  });
 });
 
-// DELETE: Remove a customer by ID
 app.delete('/api/customers/:id', (req, res) => {
-  const { id } = req.params;
-  const sql = 'DELETE FROM customers WHERE id = ?';
-  db.run(sql, [id], function(err) {
-    if (err) { return res.status(500).json({ "error": err.message }); }
-    if (this.changes === 0) { return res.status(404).json({ "error": "Customer not found" }); }
-    res.json({ "message": "deleted", "changes": this.changes });
-  });
+  try {
+    const sql = 'DELETE FROM customers WHERE id = ?';
+    const info = db.prepare(sql).run(req.params.id);
+    if (info.changes === 0) return res.status(404).json({ "error": "Customer not found" });
+    res.json({ "message": "deleted", "changes": info.changes });
+  } catch (err) {
+    res.status(500).json({ "error": err.message });
+  }
 });
-
 
 // --- ADDRESSES API ENDPOINTS ---
 
-// GET: Fetch all addresses for a specific customer
 app.get('/api/customers/:customerId/addresses', (req, res) => {
-  const { customerId } = req.params;
-  const sql = "SELECT * FROM addresses WHERE customer_id = ?";
-  db.all(sql, [customerId], (err, rows) => {
-    if (err) { return res.status(500).json({ "error": err.message }); }
+  try {
+    const sql = "SELECT * FROM addresses WHERE customer_id = ?";
+    const rows = db.prepare(sql).all(req.params.customerId);
     res.json(rows);
-  });
+  } catch (err) {
+    res.status(500).json({ "error": err.message });
+  }
 });
 
-// POST: Add a new address for a specific customer
 app.post('/api/customers/:customerId/addresses', (req, res) => {
-  const { customerId } = req.params;
-  const { addressLine1, city, state, pincode } = req.body;
-
-  if (!addressLine1 || !city || !state || !pincode) {
-    return res.status(400).json({ "error": "All address fields are required" });
+  try {
+    const { addressLine1, city, state, pincode } = req.body;
+    if (!addressLine1 || !city || !state || !pincode) {
+      return res.status(400).json({ "error": "All address fields are required" });
+    }
+    const sql = 'INSERT INTO addresses (customer_id, addressLine1, city, state, pincode) VALUES (?, ?, ?, ?, ?)';
+    const info = db.prepare(sql).run(req.params.customerId, addressLine1, city, state, pincode);
+    res.status(201).json({ "message": "Address added", "addressId": info.lastInsertRowid });
+  } catch (err) {
+    res.status(500).json({ "error": err.message });
   }
-
-  const sql = 'INSERT INTO addresses (customer_id, addressLine1, city, state, pincode) VALUES (?, ?, ?, ?, ?)';
-  const params = [customerId, addressLine1, city, state, pincode];
-  db.run(sql, params, function(err) {
-    if (err) { return res.status(500).json({ "error": err.message }); }
-    res.status(201).json({ "message": "Address added", "addressId": this.lastID });
-  });
 });
 
-// PUT: Update a specific address by its ID
 app.put('/api/addresses/:addressId', (req, res) => {
-  const { addressId } = req.params;
-  const { addressLine1, city, state, pincode } = req.body;
-
-  if (!addressLine1 || !city || !state || !pincode) {
-    return res.status(400).json({ error: "All address fields are required" });
+  try {
+    const { addressLine1, city, state, pincode } = req.body;
+    if (!addressLine1 || !city || !state || !pincode) {
+      return res.status(400).json({ error: "All address fields are required" });
+    }
+    const sql = `UPDATE addresses SET addressLine1 = ?, city = ?, state = ?, pincode = ? WHERE id = ?`;
+    const info = db.prepare(sql).run(addressLine1, city, state, pincode, req.params.addressId);
+    res.json({ message: "Address updated", changes: info.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  const sql = `UPDATE addresses SET addressLine1 = ?, city = ?, state = ?, pincode = ? WHERE id = ?`;
-  const params = [addressLine1, city, state, pincode, addressId];
-  db.run(sql, params, function(err) {
-    if (err) { return res.status(500).json({ error: err.message }); }
-    res.json({ message: "Address updated", changes: this.changes });
-  });
 });
 
-// DELETE: Delete a specific address by its ID
 app.delete('/api/addresses/:addressId', (req, res) => {
-  const { addressId } = req.params;
-  const sql = 'DELETE FROM addresses WHERE id = ?';
-  db.run(sql, [addressId], function(err) {
-    if (err) { return res.status(500).json({ error: err.message }); }
-    if (this.changes === 0) { return res.status(404).json({ error: "Address not found" }); }
-    res.json({ message: "Address deleted", changes: this.changes });
-  });
+  try {
+    const sql = 'DELETE FROM addresses WHERE id = ?';
+    const info = db.prepare(sql).run(req.params.addressId);
+    if (info.changes === 0) return res.status(404).json({ error: "Address not found" });
+    res.json({ message: "Address deleted", changes: info.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.use((err, req, res, next) => {
-  console.error(err.stack); // Log the error stack for the developer
-  res.status(500).send({ error: 'An unexpected error occurred!' }); // Send a generic message to the client
+// The "catchall" handler: for any request that doesn't match one above,
+// send back React's index.html file.
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build/index.html'));
 });
-// Start the server
+
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
