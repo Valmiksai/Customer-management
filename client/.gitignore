@@ -6,8 +6,7 @@
 # Build folder from React
 /client/build
 
-# Environment variables
-.env
+
 
 # System files
 .DS_Store
