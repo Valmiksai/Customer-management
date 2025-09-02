@@ -15,7 +15,7 @@ function CustomerFormPage() {
   // If in edit mode, fetch the customer data when the component loads
   useEffect(() => {
     if (isEditMode) {
-      axios.get(`http://localhost:5000/api/customers/${id}`)
+      axios.get(`/api/customers/${id}`)
         .then(response => {
           const { firstName, lastName, phoneNumber } = response.data;
           setFirstName(firstName);
@@ -38,12 +38,12 @@ function CustomerFormPage() {
     try {
       if (isEditMode) {
         // In edit mode, send a PUT request
-        await axios.put(`http://localhost:5000/api/customers/${id}`, customerData);
+        await axios.put(`/api/customers/${id}`, customerData);
         alert('Customer updated successfully!');
         navigate(`/customer/${id}`); // Go back to the detail page
       } else {
         // In create mode, send a POST request
-        await axios.post('http://localhost:5000/api/customers', customerData);
+        await axios.post('/api/customers', customerData);
         alert('Customer created successfully!');
         navigate('/'); // Go back to the customer list
       }

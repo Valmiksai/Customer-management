@@ -22,7 +22,7 @@ function CustomerListPage() {
       params.append('page', currentPage);
       params.append('limit', 5);
 
-      const response = await axios.get(`http://localhost:5000/api/customers?${params.toString()}`);
+      const response = await axios.get(`/api/customers?${params.toString()}`);
       
       setCustomers(response.data.data);
       setTotalPages(response.data.pagination.totalPages);

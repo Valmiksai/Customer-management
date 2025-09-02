@@ -1,10 +1,7 @@
-// File: client/src/CustomerDetailPage.js
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 
-// A sub-component for the address form.
 function AddAddressForm({ customerId, onAddressAdded }) {
   const [addressLine1, setAddressLine1] = useState('');
   const [city, setCity] = useState('');
@@ -19,7 +16,7 @@ function AddAddressForm({ customerId, onAddressAdded }) {
     }
     const newAddress = { addressLine1, city, state, pincode };
     try {
-      await axios.post(`http://localhost:5000/api/customers/${customerId}/addresses`, newAddress);
+      await axios.post(`/api/customers/${customerId}/addresses`, newAddress);
       setAddressLine1('');
       setCity('');
       setState('');
@@ -32,18 +29,17 @@ function AddAddressForm({ customerId, onAddressAdded }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ marginTop: '20px', border: '1px solid #ccc', padding: '15px', borderRadius: '5px' }}>
+    <form onSubmit={handleSubmit} className="add-address-form">
       <h4>Add New Address</h4>
-      <div><input style={{ width: '95%', marginBottom: '5px' }} value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="Address Line 1" /></div>
-      <div><input style={{ width: '95%', marginBottom: '5px' }} value={city} onChange={e => setCity(e.target.value)} placeholder="City" /></div>
-      <div><input style={{ width: '95%', marginBottom: '5px' }} value={state} onChange={e => setState(e.target.value)} placeholder="State" /></div>
-      <div><input style={{ width: '95%', marginBottom: '5px' }} value={pincode} onChange={e => setPincode(e.target.value)} placeholder="Pincode" /></div>
+      <input value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="Address Line 1" />
+      <input value={city} onChange={e => setCity(e.target.value)} placeholder="City" />
+      <input value={state} onChange={e => setState(e.target.value)} placeholder="State" />
+      <input value={pincode} onChange={e => setPincode(e.target.value)} placeholder="Pincode" />
       <button type="submit">Add Address</button>
     </form>
   );
 }
 
-// The main component for the Customer Detail Page.
 function CustomerDetailPage() {
   const [customer, setCustomer] = useState(null);
   const [addresses, setAddresses] = useState([]);
@@ -52,24 +48,24 @@ function CustomerDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const fetchAddresses = () => {
-    axios.get(`http://localhost:5000/api/customers/${id}/addresses`)
+  const fetchAddresses = useCallback(() => {
+    axios.get(`/api/customers/${id}/addresses`)
       .then(response => setAddresses(response.data))
       .catch(error => console.error('Error fetching addresses:', error));
-  };
-
-  useEffect(() => {
-    axios.get(`http://localhost:5000/api/customers/${id}`)
-      .then(response => setCustomer(response.data))
-      .catch(error => console.error('Error fetching customer details:', error));
-    fetchAddresses();
   }, [id]);
 
-  // ✅ THIS IS THE CORRECTED FUNCTION
+  useEffect(() => {
+    axios.get(`/api/customers/${id}`)
+      .then(response => setCustomer(response.data))
+      .catch(error => console.error('Error fetching customer details:', error));
+    
+    fetchAddresses();
+  }, [id, fetchAddresses]);
+
   const handleCustomerDelete = async () => {
     if (window.confirm('Are you sure you want to delete this customer? This action cannot be undone.')) {
       try {
-        await axios.delete(`http://localhost:5000/api/customers/${id}`);
+        await axios.delete(`/api/customers/${id}`);
         alert('Customer deleted successfully!');
         navigate('/');
       } catch (error) {
@@ -82,7 +78,7 @@ function CustomerDetailPage() {
   const handleAddressDelete = async (addressId) => {
     if (window.confirm('Are you sure you want to delete this address?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/addresses/${addressId}`);
+        await axios.delete(`/api/addresses/${addressId}`);
         fetchAddresses();
       } catch (error) {
         console.error('Failed to delete address:', error);
@@ -99,7 +95,7 @@ function CustomerDetailPage() {
   const handleAddressUpdate = async (e) => {
     e.preventDefault();
     try {
-      await axios.put(`http://localhost:5000/api/addresses/${editingAddressId}`, editFormData);
+      await axios.put(`/api/addresses/${editingAddressId}`, editFormData);
       setEditingAddressId(null);
       fetchAddresses();
     } catch (error) {
